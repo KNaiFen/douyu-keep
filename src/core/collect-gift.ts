@@ -158,13 +158,23 @@ export async function collectGiftViaDanmu(cookie: string, roomId: number | strin
     }, COLLECT_TIMEOUT_MS)
 
     ws.on('open', () => {
+      if (settled) {
+        return
+      }
       ws.send(buildLoginPacket(normalizedRoomId, cookie))
     })
 
     ws.on('message', (data) => {
       for (const message of decodeDouyuMessages(data)) {
-        if (message.startsWith('type@=loginres')) {
-          if (message.includes('roomgroup@=1')) {
+        if (settled) {
+          break
+        }
+        const fields = Object.fromEntries(message.split('/').map(field => field.split('@=')))
+        if (fields.type === 'loginres') {
+          if (loginAccepted) {
+            continue
+          }
+          if (fields.roomgroup === '1') {
             loginAccepted = true
             ws.send(buildEnterRoomPacket(normalizedRoomId))
           } else {
@@ -173,8 +183,8 @@ export async function collectGiftViaDanmu(cookie: string, roomId: number | strin
           }
         }
 
-        if (message.startsWith('type@=h5ckres')) {
-          finish()
+        if (fields.type === 'h5ckres') {
+          finish(loginAccepted ? undefined : new Error('领取荧光棒失败: 未完成弹幕鉴权即收到领取响应'))
         }
       }
     })

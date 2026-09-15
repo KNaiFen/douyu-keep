@@ -36,6 +36,9 @@ function resolveYubaSignResult(body: YubaBody, groupId: number, successMode: Yub
   if (message.includes('今日已签到') || message.includes('已经签到') || message.includes('已签到')) {
     return 'already_signed'
   }
+  if ((statusCode !== 0 && statusCode !== 200) || (errorCode !== 0 && errorCode !== 200)) {
+    throw new Error(getYubaErrorMessage(body, `鱼吧${groupId}签到失败`))
+  }
   if (message.includes('签到成功')) {
     return 'signed'
   }
@@ -228,15 +231,14 @@ export async function executeFollowedYubaCheckInWithDyToken(yubaCookie: string, 
       const message = errorMessage(error)
       if (shouldSkipClosedYuba(message)) {
         log(`鱼吧 ${group.name}(${group.groupId}) 已关闭或不存在，跳过后续签到`)
-        continue
-      }
-
-      failedCount += 1
-      log(`鱼吧 ${group.name}(${group.groupId}) 签到失败: ${message}`)
-      if (shouldStopAfterYubaFailure(message)) {
-        stoppedEarly = true
-        log('检测到登录态、CSRF 或 Gee 风控问题，本轮鱼吧签到提前结束')
-        break
+      } else {
+        failedCount += 1
+        log(`鱼吧 ${group.name}(${group.groupId}) 签到失败: ${message}`)
+        if (shouldStopAfterYubaFailure(message)) {
+          stoppedEarly = true
+          log('检测到登录态、CSRF 或 Gee 风控问题，本轮鱼吧签到提前结束')
+          break
+        }
       }
     }
 
