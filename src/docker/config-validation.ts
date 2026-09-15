@@ -178,6 +178,9 @@ export function validateCookieCloudConfig(input: CookieCloudConfig | unknown): s
   if (!config) {
     return 'CookieCloud 配置无效'
   }
+  if (['endpoint', 'uuid', 'password'].some(key => config[key] !== undefined && typeof config[key] !== 'string')) {
+    return 'CookieCloud 地址、UUID 和密码必须是字符串'
+  }
   if (config.enabled !== undefined && typeof config.enabled !== 'boolean') {
     return 'CookieCloud 启用状态无效'
   }

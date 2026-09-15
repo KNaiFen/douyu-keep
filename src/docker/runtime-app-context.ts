@@ -55,7 +55,8 @@ function hasSendRooms(config: JobConfig | DoubleCardConfig | ExpiringGiftConfig 
 }
 
 function hasCookieSourcePayload(config: DockerConfigUpdate): boolean {
-  return config.cookieCloud !== undefined
+  return config.cookie !== undefined
+    || config.cookieCloud !== undefined
     || config.loginCookies !== undefined
     || config.manualCookies !== undefined
     || config.manualPassport !== undefined

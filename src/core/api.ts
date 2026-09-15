@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { createGiftRejectionError } from './gift-execution'
 import type { BackpackGiftRow, BackpackStatus, Fans, GiftSendJob, GiftStatus, SendGiftRequestArgs } from './types'
 
 export const DOUYU_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36 Edg/115.0.1901.188'
@@ -37,11 +38,11 @@ export function getCookieValue(cookie: string, name: string): string | undefined
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 function readResponseNumber(value: unknown): number | undefined {
-  if (value === null || value === undefined || value === '') {
+  if ((typeof value !== 'string' && typeof value !== 'number') || String(value).trim() === '') {
     return undefined
   }
 
@@ -76,13 +77,24 @@ function assertDouyuBusinessSuccess(data: unknown, action: string): Record<strin
   }
 
   const errorCode = readResponseNumber(data.error)
-  if (errorCode !== undefined && errorCode !== 0) {
-    throw new Error(`${action}失败，接口返回错误码 ${errorCode}: ${getDouyuResponseMessage(data, '无错误信息')}`)
+  const code = readResponseNumber(data.code)
+  const statusCode = readResponseNumber(data.status_code)
+  // Validate the complete envelope before treating a rejection as safe to carry forward.
+  if ((data.error !== undefined && errorCode === undefined)
+    || (data.code !== undefined && code === undefined)
+    || (data.status_code !== undefined && statusCode === undefined)
+    || (errorCode === undefined && code === undefined && statusCode === undefined)) {
+    throw new Error(`${action}失败，返回数据缺少有效成功状态`)
   }
 
-  const code = readResponseNumber(data.code ?? data.status_code)
-  if (code !== undefined && code !== 0 && code !== 200) {
-    throw new Error(`${action}失败，接口返回状态码 ${code}: ${getDouyuResponseMessage(data, '无错误信息')}`)
+  if (errorCode !== undefined && errorCode !== 0) {
+    throw createGiftRejectionError(`${action}失败，接口返回错误码 ${errorCode}: ${getDouyuResponseMessage(data, '无错误信息')}`)
+  }
+
+  for (const status of [code, statusCode]) {
+    if (status !== undefined && status !== 0 && status !== 200) {
+      throw createGiftRejectionError(`${action}失败，接口返回状态码 ${status}: ${getDouyuResponseMessage(data, '无错误信息')}`)
+    }
   }
 
   return data

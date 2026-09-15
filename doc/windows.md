@@ -74,6 +74,10 @@ uninstall keeps the user data directory and removes its autostart entry.
 - fnOS contract tests normalize checkout newlines and verify executable Git modes
   on Windows while preserving POSIX filesystem checks on Linux.
 
+The follow-up [business logic audit](business-audit.md) covers uncertain gift
+results, allocation and expiry validation, collection and Yuba failures,
+account/cache isolation, concurrent config writes and queued credential changes.
+
 ## Repository
 
 Public fork: https://github.com/KNaiFen/douyu-keep
@@ -89,7 +93,7 @@ The inherited Docker workflow cannot publish the upstream image from this fork.
 ## Verification
 
 Quality checks are `npm run lint`, `npm run type-check`, and
-`npm run test:contracts` (63 offline cases). `npm run dist:win` builds the
+`npm run test:contracts` (87 offline cases). `npm run dist:win` builds the
 WebUI/backend, native launcher, portable ZIP, and NSIS installer.
 
 After building, `npm run test:windows` uses Playwright with installed Chrome.

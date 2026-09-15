@@ -1,6 +1,6 @@
 import { getBackpackStatus, getDid, getGiftNumber, parseDyAndSidFromCookie, sendGift, sleep } from './api'
 import { errorMessage } from './errors'
-import { markGiftMutationAttempted } from './gift-execution'
+import { isGiftRejectionError, markGiftMutationAttempted } from './gift-execution'
 import type { BackpackStatus, GiftSendJobs, Logger, SendGiftRequestArgs } from './types'
 
 export type RoomDidResolver = (roomId: number) => Promise<string>
@@ -93,6 +93,12 @@ export async function sendGifts(options: {
     completionLabel = '任务',
     resolveDid: providedResolveDid,
   } = options
+  if (Object.values(jobs).some(item => !Number.isSafeInteger(item.roomId) || item.roomId <= 0
+    || !Number.isSafeInteger(item.giftId) || item.giftId <= 0
+    || !Number.isSafeInteger(item.count) || item.count < 0)
+  || !Number.isSafeInteger(Object.values(jobs).reduce((sum, item) => sum + item.count, 0))) {
+    throw new Error('赠送计划包含无效房间、礼物或数量')
+  }
   let args: SendGiftRequestArgs
   try {
     args = parseDyAndSidFromCookie(cookie)
@@ -106,16 +112,23 @@ export async function sendGifts(options: {
   const resolveDid = providedResolveDid || createRoomDidResolver(cookie)
   const sendJobs = Object.values(jobs).filter(item => item.count !== 0)
   for (const [index, item] of sendJobs.entries()) {
+    let sendAttempted = false
     try {
       log(`即将赠送${item.roomId}房间${item.count + failedNumber}个${giftLabel}`)
       const did = await resolveDid(item.roomId)
       args.did = did
       const attempt = { ...item, count: item.count + failedNumber }
       markGiftMutationAttempted()
+      sendAttempted = true
       await sendGift(args, attempt, cookie)
       failedNumber = 0
       log(`赠送${item.roomId}房间${attempt.count}个${giftLabel}成功`)
     } catch (error) {
+      if (sendAttempted && !isGiftRejectionError(error)) {
+        const message = `${item.roomId}房间赠送结果未知，已停止本次任务以避免重复赠送，请核对背包后再操作: ${errorMessage(error)}`
+        log(message)
+        throw new Error(message)
+      }
       failedNumber += item.count
       lastFailure = error
       log(`${item.roomId}房间赠送失败: ${errorMessage(error)}, ${failedNumber}个${giftLabel}${index < sendJobs.length - 1 ? '自动移交给下一个房间' : '未赠送成功'}`)

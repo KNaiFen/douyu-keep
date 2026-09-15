@@ -1,30 +1,9 @@
 const assert = require('node:assert/strict')
-const fs = require('node:fs')
-const path = require('node:path')
-const vm = require('node:vm')
-const ts = require('typescript')
 const { test } = require('node:test')
-
-const repoRoot = path.resolve(__dirname, '..')
+const { loadTypeScriptModule } = require('./helpers/typescript-module-loader')
 
 function loadApiModule(axiosMock) {
-  const source = fs.readFileSync(path.join(repoRoot, 'src/core/api.ts'), 'utf8')
-  const output = ts.transpileModule(source, {
-    compilerOptions: {
-      module: ts.ModuleKind.CommonJS,
-      target: ts.ScriptTarget.ES2022,
-    },
-  }).outputText
-  const exports = {}
-  const module = { exports }
-  function localRequire(name) {
-    if (name === 'axios') {
-      return axiosMock
-    }
-    return require(name)
-  }
-  vm.runInNewContext(output, { exports, module, require: localRequire }, { filename: 'api.js' })
-  return module.exports
+  return loadTypeScriptModule('src/core/api.ts', { axios: axiosMock })
 }
 
 function fansRow({ name, roomId, level, rank, intimacy, today }) {

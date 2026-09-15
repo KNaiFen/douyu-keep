@@ -2,6 +2,30 @@ const assert = require('node:assert/strict')
 const { test } = require('node:test')
 const { loadTypeScriptModule } = require('./helpers/typescript-module-loader')
 
+test('legacy cookie updates apply credential lifecycle instead of only replacing UI state', async () => {
+  const { normalizeDockerConfig } = loadTypeScriptModule('src/core/config-normalization.ts')
+  const { createRuntimeAppContext } = loadTypeScriptModule('src/docker/runtime-app-context.ts')
+  let current = normalizeDockerConfig({ loginCookies: { main: 'fixture-old' } })
+  const applied = []
+  const ctx = createRuntimeAppContext({
+    getCurrentConfig: () => current,
+    getConfigPath: () => 'unused.json',
+    saveConfig: () => {},
+    setCurrentConfig: (config) => {
+      current = config
+    },
+    applyConfig: (config, reason) => {
+      current = config
+      applied.push(reason)
+    },
+    hasConfiguredCookieSource: () => true,
+    logSystem: () => {},
+  })
+  await ctx.saveTaskConfig({ cookie: 'fixture-new' })
+  assert.equal(current.loginCookies.main, 'fixture-new')
+  assert.deepEqual(applied, ['cookie_saved'])
+})
+
 test('allocation validation rejects malformed room IDs and unsafe fixed counts', () => {
   const { validateJobConfig, validateDoubleCardConfig } = loadTypeScriptModule('src/docker/config-validation.ts')
   const base = { cron: '0 0 * * *', allocationMode: 'fixed', roomAllocations: { 101: { count: 1 } } }

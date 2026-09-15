@@ -399,13 +399,40 @@ the expiring-gift and limited-time double-card jobs.
 - Failed room lookup -> current send attempt fails and carries its count; later
   groups may resolve the room again.
 - Missing `sid` / `dy` -> log and propagate the original error.
-- Failed gift send -> carry the attempted count to the next room exactly once.
+- Definite gift rejection -> carry the attempted count to the next room exactly once.
+- Carry-over after a send requires a definite business rejection. Network errors
+  or malformed/missing status envelopes leave the result uncertain: stop without
+  sending that quantity to another room. Validate every supplied status field
+  before classifying the response; one valid field cannot mask a malformed one.
 - Unsent final quantity -> throw so the manual API cannot report success.
 - Preserve the caller's allocation objects; retries must not mutate planned counts.
 - Inventory tasks (collect, keepalive, double-card, expiring) share a FIFO queue
   across scheduled and manual runs. Keep same-type locks while queued, release
   in finally, and preserve active locks on cron reload. Runtime shutdown stops
   cron and waits for all queued/executing tasks before finishing.
+- Compare the main cookie before and after waiting for the inventory queue. If
+  it changed, cancel rather than execute captured room settings on another account.
+- Allocation budgets and send plans require safe integer counts and valid room /
+  gift IDs. Weighted mode reserves one gift per positive-weight room or rejects
+  insufficient inventory. Expiring budgets exclude already expired/invalid rows.
+
+Account/config regression contracts:
+
+- Fans caches and pending full-status requests are cookie-scoped. Account changes
+  invalidate generation counters; late responses cannot replace current snapshots.
+- A fans sync cannot overwrite configuration changed during its remote request.
+  Merge newer same-account settings for background reconciliation; reject stale
+  explicit saves and credential/source changes.
+- Validate config and credential section shapes before normalization/persistence,
+  including CookieCloud string fields. Legacy cookie updates apply credential
+  lifecycle hooks just like canonical login-cookie updates.
+- Collection completion requires exact authenticated group matching and entry.
+  Yuba explicit failure statuses take precedence over success-like text/data,
+  closed groups retain pacing, and incomplete main sign-in results reject the job.
+
+Regression coverage: `test/business-gifts.test.js`,
+`test/business-collect-yuba.test.js`, `test/business-config-state.test.js`,
+`test/scheduler-safety.test.js`, `test/server-route-guardrails-contract.test.js`.
 
 ### 5. Good/Base/Bad Cases
 

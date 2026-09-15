@@ -8,11 +8,21 @@ function createGiftSendJobs(entries: Array<{ roomId: number; count: number }>): 
   }, {} as GiftSendJobs)
 }
 
+function validateInventory(number: number): void {
+  if (!Number.isSafeInteger(number) || number < 0) {
+    throw new Error('礼物库存数量无效')
+  }
+}
+
 export function computeGiftCountOfNumber(number: number, roomAllocations: FixedAllocationConfig['roomAllocations']): GiftSendJobs {
+  validateInventory(number)
   const allocations = Object.entries(roomAllocations)
     .map(([roomId, item]) => ({ roomId: Number(roomId), configuredCount: item.count }))
     .sort((a, b) => b.configuredCount - a.configuredCount)
   const configuredCount = allocations.reduce((sum, item) => sum + (item.configuredCount === -1 ? 0 : item.configuredCount), 0)
+  if (!Number.isSafeInteger(configuredCount) || allocations.some(item => !Number.isSafeInteger(item.configuredCount) || item.configuredCount < -1)) {
+    throw new Error('固定数量配置无效')
+  }
   if (configuredCount > number) {
     throw new Error(`荧光棒数量不足,请重新配置. 当前${number}个, 需求${configuredCount}个`)
   }
@@ -34,12 +44,20 @@ export function computeGiftCountOfNumber(number: number, roomAllocations: FixedA
 }
 
 export function computeGiftCountOfProportion(number: number, roomAllocations: WeightedAllocationConfig['roomAllocations']): GiftSendJobs {
+  validateInventory(number)
   const allocations = Object.entries(roomAllocations)
     .map(([roomId, item]) => ({ roomId: Number(roomId), weight: item.weight, count: 0 }))
     .sort((a, b) => a.weight - b.weight)
   const totalWeight = allocations.reduce((sum, item) => sum + item.weight, 0)
+  if (!Number.isFinite(totalWeight) || allocations.some(item => !Number.isFinite(item.weight) || item.weight < 0)) {
+    throw new Error('权重配置无效')
+  }
   if (totalWeight <= 0) {
     throw new Error('按权重模式至少需要一个房间填写大于 0 的权重值')
+  }
+  const positiveRooms = allocations.filter(item => item.weight > 0).length
+  if (number < positiveRooms) {
+    throw new Error(`荧光棒数量不足,请重新配置. 当前${number}个, 需求至少${positiveRooms}个`)
   }
 
   for (let index = 0; index < allocations.length; index += 1) {
@@ -52,7 +70,9 @@ export function computeGiftCountOfProportion(number: number, roomAllocations: We
       item.count = count
     } else if (item.weight > 0) {
       const count = Math.floor((item.weight / totalWeight) * number)
-      item.count = count === 0 ? 1 : count
+      const assigned = allocations.reduce((sum, entry) => sum + entry.count, 0)
+      const reserved = allocations.slice(index + 1).filter(entry => entry.weight > 0).length
+      item.count = Math.min(Math.max(1, count), number - assigned - reserved)
     }
   }
 

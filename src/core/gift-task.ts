@@ -44,8 +44,9 @@ export function hasActiveDoubleCardRoom(doubleCardRooms: Record<string, boolean>
 }
 
 export function getEarliestPositiveGiftExpireTime(status: BackpackStatus): number | undefined {
+  const now = Date.now()
   const expireTimes = status.rows
-    .filter(row => Number.isFinite(row.count) && row.count > 0 && row.expireTime)
+    .filter(row => Number.isSafeInteger(row.count) && row.count > 0 && Number.isFinite(row.expireTime) && row.expireTime! > now)
     .map(row => row.expireTime!)
   return expireTimes.length ? Math.min(...expireTimes) : undefined
 }
@@ -60,13 +61,19 @@ export function selectExpiringGiftCandidates(status: BackpackStatus, options: {
   const candidates: BackpackGiftRow[] = []
   let skippedNotExpiring = 0
   let skippedNoExpireTime = 0
+  let skippedUnsafe = 0
 
   for (const row of status.rows) {
-    if (!Number.isFinite(row.count) || row.count <= 0) {
+    if (!Number.isSafeInteger(row.count) || row.count <= 0 || !Number.isSafeInteger(row.giftId) || row.giftId <= 0) {
+      skippedUnsafe += 1
       continue
     }
-    if (!row.expireTime) {
+    if (!Number.isFinite(row.expireTime) || !row.expireTime || row.expireTime <= 0) {
       skippedNoExpireTime += 1
+      continue
+    }
+    if (row.expireTime <= now) {
+      skippedUnsafe += 1
       continue
     }
     if (!options.includeAllExpiring && row.expireTime - now > thresholdMs) {
@@ -94,7 +101,7 @@ export function selectExpiringGiftCandidates(status: BackpackStatus, options: {
     totalRows: status.totalRows,
     skippedNotExpiring,
     skippedNoExpireTime,
-    skippedUnsafe: 0,
+    skippedUnsafe,
     budgetCount,
     earliestExpireTime: expireTimes.length ? Math.min(...expireTimes) : undefined,
     giftCounts,

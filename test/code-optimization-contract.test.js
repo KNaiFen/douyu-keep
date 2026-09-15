@@ -86,7 +86,9 @@ test('room DID resolver retries lookups that previously failed', async () => {
 test('gift sends stay serial, carry failed counts forward, and delay only between attempts', async () => {
   const events = []
   let sendAttempt = 0
+  const execution = loadTypeScriptModule('src/core/gift-execution.ts')
   const { sendGifts } = loadTypeScriptModule('src/core/job-gift-utils.ts', {
+    './gift-execution': execution,
     './api': {
       getDid: async roomId => `did-${roomId}`,
       parseDyAndSidFromCookie: () => ({ sid: 'sid', dy: 'dy' }),
@@ -94,7 +96,7 @@ test('gift sends stay serial, carry failed counts forward, and delay only betwee
         sendAttempt += 1
         events.push(`send:${job.roomId}:${job.count}`)
         if (sendAttempt === 1) {
-          throw new Error('first send failed')
+          throw execution.createGiftRejectionError('first send failed')
         }
       },
       sleep: async delay => events.push(`sleep:${delay}`),

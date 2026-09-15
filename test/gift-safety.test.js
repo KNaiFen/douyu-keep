@@ -28,7 +28,7 @@ function jobs() {
 test('consecutive failures carry each allocation once and leave the plan unchanged', async () => {
   const harness = giftHarness(async (item) => {
     if (item.roomId < 3) {
-      throw new Error('rejected')
+      throw harness.execution.createGiftRejectionError('rejected')
     }
   })
   const plan = Object.freeze(jobs())
@@ -40,7 +40,7 @@ test('consecutive failures carry each allocation once and leave the plan unchang
 
 test('incomplete sending rejects with the correct remaining count', async () => {
   const harness = giftHarness(async () => {
-    throw new Error('cookie expired')
+    throw harness.execution.createGiftRejectionError('cookie expired')
   })
   await assert.rejects(harness.utils.sendGifts({ jobs: jobs(), cookie: '', log: () => {} }), /有6个.*未赠送成功/)
 })

@@ -2,6 +2,17 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 
 const execution = new AsyncLocalStorage<{ mutationAttempted: boolean }>()
 const nonReplayableErrors = new WeakSet<object>()
+const rejectedGiftErrors = new WeakSet<object>()
+
+export function createGiftRejectionError(message: string): Error {
+  const error = new Error(message)
+  rejectedGiftErrors.add(error)
+  return error
+}
+
+export function isGiftRejectionError(error: unknown): boolean {
+  return error instanceof Error && rejectedGiftErrors.has(error)
+}
 
 export function markGiftMutationAttempted(): void {
   const state = execution.getStore()

@@ -180,6 +180,32 @@ async function loginAndGetSessionCookie(baseUrl) {
   return getSessionCookie(login.response)
 }
 
+test('config and cookie routes reject malformed payloads before modifying saved credentials', async () => {
+  const { context, calls } = createRouteTestContext()
+  await withServer(createServer(context), async (baseUrl) => {
+    const cookie = await loginAndGetSessionCookie(baseUrl)
+    for (const body of [undefined, [], { loginCookies: { main: 123 } }, { loginCookies: [] }, { manualPassport: { cookie: [] } }, { ui: [] }, { ui: { themeMode: 'invalid' } }, { keepalive: false }, { collectGift: 0 }, { cookieCloud: false }, { cookieCloud: { endpoint: {} } }, { cookieCloud: { uuid: 123 } }, { cookieCloud: { password: [] } }]) {
+      const result = await requestJson(`${baseUrl}/api/config`, {
+        method: 'POST',
+        headers: { Cookie: cookie, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      })
+      assert.equal(result.response.status, 400)
+      assert.equal(typeof result.body.error, 'string')
+    }
+    for (const body of [{ mainCookie: {} }, { cookie: 123 }, { yubaCookie: ['invalid'] }]) {
+      const result = await requestJson(`${baseUrl}/api/cookie`, {
+        method: 'POST',
+        headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      assert.equal(result.response.status, 400)
+    }
+    assert.deepEqual(calls.saveTaskConfig, [])
+    assert.deepEqual(calls.saveCookie, [])
+  })
+})
+
 test('createServer injects configured WebUI theme into served HTML', async () => {
   const { context, setConfig } = createRouteTestContext()
   setConfig({

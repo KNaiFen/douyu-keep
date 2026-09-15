@@ -45,33 +45,46 @@ function summarizeConfig(config: DockerConfig | null) {
 }
 
 function validateConfigPayload(payload: DockerConfigUpdate): string | null {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return '配置必须是对象'
+  }
   for (const type of TASK_TYPES) {
     const taskConfig = payload[type]
-    if (!taskConfig) {
+    if (taskConfig === undefined || taskConfig === null) {
       continue
+    }
+    if (typeof taskConfig !== 'object' || Array.isArray(taskConfig)) {
+      return `${type} 配置无效`
     }
     const error = validateTaskConfig(type, taskConfig)
     if (error) {
       return error
     }
   }
-  if (payload.loginCookies && (typeof payload.loginCookies !== 'object' || Array.isArray(payload.loginCookies))) {
-    return 'loginCookies 配置无效'
+  for (const key of ['loginCookies', 'manualCookies', 'manualPassport'] as const) {
+    const section = payload[key]
+    if (section === undefined || section === null) {
+      continue
+    }
+    if (typeof section !== 'object' || Array.isArray(section)
+      || Object.values(section).some(value => typeof value !== 'string')) {
+      return `${key} 配置无效`
+    }
   }
-  if (payload.manualCookies && (typeof payload.manualCookies !== 'object' || Array.isArray(payload.manualCookies))) {
-    return 'manualCookies 配置无效'
+  if (payload.cookie !== undefined && typeof payload.cookie !== 'string') {
+    return 'cookie 配置无效'
   }
-  if (payload.manualPassport && (typeof payload.manualPassport !== 'object' || Array.isArray(payload.manualPassport))) {
-    return 'manualPassport 配置无效'
-  }
-  if (payload.cookieCloud) {
+  if (payload.cookieCloud !== undefined && payload.cookieCloud !== null) {
     const error = validateCookieCloudConfig(payload.cookieCloud)
     if (error) {
       return error
     }
   }
-  if (payload.ui && typeof payload.ui !== 'object') {
-    return 'ui 配置无效'
+  if (payload.ui !== undefined && payload.ui !== null) {
+    if (typeof payload.ui !== 'object' || Array.isArray(payload.ui)
+      || (payload.ui.themeMode !== undefined && !['light', 'dark', 'system'].includes(payload.ui.themeMode))) {
+      return 'ui 配置无效'
+    }
   }
   return null
 }
@@ -106,6 +119,9 @@ export function registerConfigRoutes(app: express.Express, ctx: AppContext): voi
   })
 
   app.post('/api/cookie', async (req, res) => {
+    if (['mainCookie', 'cookie', 'yubaCookie'].some(key => req.body?.[key] !== undefined && typeof req.body[key] !== 'string')) {
+      return res.status(400).json({ error: 'Cookie 必须是字符串' })
+    }
     const mainCookie = String(req.body?.mainCookie ?? req.body?.cookie ?? '').trim()
     const yubaCookie = String(req.body?.yubaCookie || '').trim()
     if (!mainCookie && !yubaCookie) {
