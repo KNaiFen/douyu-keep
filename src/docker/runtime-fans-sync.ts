@@ -30,11 +30,17 @@ export class DockerRuntimeFansSyncService {
     const shouldMergeLatestCookieSnapshot = Boolean(baseConfig && cookieSnapshotEqual(baseConfig, this.deps.getCurrentConfig()))
 
     return await this.deps.runWithCookieSourceRetry('同步粉丝牌', async () => {
+      const initialConfig = this.deps.getCurrentConfig()
       const sourceConfig = normalizeDockerConfig(baseConfig || this.deps.getCurrentConfig() || createDefaultDockerConfig())
       const cookieConfig = shouldMergeLatestCookieSnapshot ? this.mergeLatestCookieSnapshot(sourceConfig) : sourceConfig
       const cookie = this.deps.resolveCookieForUrlFromConfig(MAIN_DOUYU_URL, cookieConfig)
       const fans = await this.deps.getFansList(cookie)
-      const nextConfig = reconcileDockerConfig(cookieConfig, fans)
+      const latestConfig = this.deps.getCurrentConfig()
+      const configChanged = !jsonEquals(initialConfig, latestConfig)
+      if (configChanged && (baseConfig || !cookieSnapshotEqual(initialConfig, latestConfig) || !jsonEquals(initialConfig?.cookieCloud, latestConfig?.cookieCloud))) {
+        throw new Error('同步期间配置已变化，请重新刷新或保存')
+      }
+      const nextConfig = reconcileDockerConfig(configChanged && latestConfig ? latestConfig : cookieConfig, fans)
       this.deps.invalidateStatusCaches('fans')
 
       if (!configsEqual(this.deps.getCurrentConfig(), nextConfig)) {

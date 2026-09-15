@@ -100,6 +100,7 @@ function createFansListStatusResponse(fans: Fans[]): FansStatusResponse {
 export class DockerRuntimeCache {
   private readonly fansListCache: FansListCacheEntry = createFansListCache()
   private readonly fansStatusCache: StatusCacheEntry<FansStatusResponse> = createStatusCache()
+  private fansStatusCookie = ''
   private readonly yubaStatusCache: StatusCacheEntry<YubaStatusResponse> = createStatusCache()
 
   clearFansList(): void {
@@ -130,7 +131,7 @@ export class DockerRuntimeCache {
       return await this.fansListCache.pending
     }
 
-    if (forceRefresh) {
+    if (forceRefresh || !sameCookie) {
       this.clearFansList()
     }
 
@@ -157,6 +158,7 @@ export class DockerRuntimeCache {
   }
 
   async getFansStatusBase(cookie: string, forceRefresh = false): Promise<FansStatusResponse> {
+    this.useFansStatusCookie(cookie)
     if (forceRefresh && !this.fansStatusCache.pending) {
       clearStatusCache(this.fansStatusCache)
     }
@@ -171,6 +173,7 @@ export class DockerRuntimeCache {
   }
 
   async getFansStatus(cookie: string, logSystem: (message: string) => void, forceRefresh = false): Promise<FansStatusResponse> {
+    this.useFansStatusCookie(cookie)
     return await getCachedStatus(this.fansStatusCache, FANS_STATUS_CACHE_TTL_MS, async () => {
       const fans = await this.getFansList(cookie, forceRefresh)
       return await this.buildFansStatusSnapshot(cookie, fans, logSystem)
@@ -179,6 +182,13 @@ export class DockerRuntimeCache {
 
   async getYubaStatus(fetchStatus: () => Promise<YubaStatusResponse>, forceRefresh = false): Promise<YubaStatusResponse> {
     return await getCachedStatus(this.yubaStatusCache, YUBA_STATUS_CACHE_TTL_MS, fetchStatus, forceRefresh)
+  }
+
+  private useFansStatusCookie(cookie: string): void {
+    if (this.fansStatusCookie !== cookie) {
+      clearStatusCache(this.fansStatusCache)
+      this.fansStatusCookie = cookie
+    }
   }
 
   private async buildFansStatusSnapshot(cookie: string, fans: Fans[], logSystem: (message: string) => void): Promise<FansStatusResponse> {

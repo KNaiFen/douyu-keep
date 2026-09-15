@@ -9,6 +9,13 @@ function asRecord(value: unknown): UnknownRecord | undefined {
     : undefined
 }
 
+function isRoomId(value: unknown): boolean {
+  if (typeof value !== 'number' && (typeof value !== 'string' || !/^[1-9]\d*$/.test(value))) {
+    return false
+  }
+  return Number.isSafeInteger(Number(value)) && Number(value) > 0
+}
+
 export function validateCronConfig(name: string, config: { cron?: unknown; enabled?: unknown; active?: unknown }): string | null {
   if (config.enabled !== undefined && typeof config.enabled !== 'boolean') {
     return `${name} 启用状态无效`
@@ -52,6 +59,9 @@ export function validateJobConfig(name: string, input: JobConfig | unknown): str
   if (!allocations) {
     return `${name} 房间配置无效`
   }
+  if (Object.keys(allocations).some(roomId => !isRoomId(roomId))) {
+    return `${name} 房间编号无效`
+  }
 
   if (allocationMode === 'weighted') {
     for (const [key, rawItem] of Object.entries(allocations)) {
@@ -79,7 +89,7 @@ export function validateJobConfig(name: string, input: JobConfig | unknown): str
       return `${name} 房间 ${key} 的权重字段不适用于固定数量模式`
     }
     const value = hasCanonicalAllocations ? item.count : item.number
-    if (!Number.isInteger(value) || Number(value) < -1) {
+    if (!Number.isSafeInteger(value) || Number(value) < -1) {
       return `${name} 房间 ${key} 的数量无效`
     }
     if (value === -1) {
@@ -107,7 +117,10 @@ export function validateDoubleCardConfig(input: DoubleCardConfig | unknown): str
   if (config.participatingRoomIds !== undefined && !Array.isArray(config.participatingRoomIds)) {
     return 'doubleCard 勾选配置无效'
   }
-  if (Array.isArray(config.participatingRoomIds) && config.participatingRoomIds.some(roomId => !Number.isInteger(Number(roomId)))) {
+  if (Array.isArray(config.participatingRoomIds) && config.participatingRoomIds.some(roomId => !isRoomId(roomId))) {
+    return 'doubleCard 勾选配置无效'
+  }
+  if (legacyParticipatingRooms && Object.keys(legacyParticipatingRooms).some(roomId => !isRoomId(roomId))) {
     return 'doubleCard 勾选配置无效'
   }
   if (config.enabled !== undefined && typeof config.enabled !== 'boolean' && !asRecord(config.enabled)) {
