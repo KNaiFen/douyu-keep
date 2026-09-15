@@ -68,7 +68,7 @@ export async function executeExpiringGiftJob(config: ExpiringGiftConfig, cookie:
       }
     } catch (error: unknown) {
       log(`计算${giftLabel}临期赠送数量失败: ${errorMessage(error)}`)
-      continue
+      throw error
     }
 
     applyGiftIdToSendJobs(jobs, group.giftId)

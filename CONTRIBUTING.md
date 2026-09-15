@@ -1,8 +1,15 @@
 # Contributing
 
-Thanks for taking the time to improve this project. The maintained runtime is
-the Docker WebUI, so contributions should keep the Docker deployment path
-working first.
+This fork maintains Windows desktop support and the existing Docker WebUI.
+Shared business logic and the Docker deployment path must remain compatible.
+
+## Windows Development
+
+Use Node.js 24 on Windows 10/11 x64. After `npm ci`, run `npm run dev:desktop`.
+Use `npm run dist:win` for the x64 ZIP and NSIS installer under `release/`.
+Desktop host code belongs in `src/desktop/`; share the backend and Vue UI.
+Run `npm run lint`, `npm run type-check`, and `npm run test:contracts` before
+packaging. Never use real account data in smoke tests or captured screenshots.
 
 ## Local Setup
 

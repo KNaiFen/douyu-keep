@@ -16,8 +16,15 @@ export class DockerCookieCloudSyncService {
   private job: CronJob | null = null
 
   private running = false
+  private readonly idleWaiters = new Set<() => void>()
 
   constructor(private readonly deps: CookieCloudSyncDeps) {}
+
+  async waitForIdle(): Promise<void> {
+    if (this.running) {
+      await new Promise<void>(resolve => this.idleWaiters.add(resolve))
+    }
+  }
 
   stop(): void {
     if (this.job) {
@@ -51,6 +58,8 @@ export class DockerCookieCloudSyncService {
       this.deps.logSystem(`${reason === 'startup' ? 'CookieCloud 启动同步' : 'CookieCloud 每日同步'}失败: ${errorMessage(error)}`)
     } finally {
       this.running = false
+      this.idleWaiters.forEach(resolve => resolve())
+      this.idleWaiters.clear()
     }
   }
 

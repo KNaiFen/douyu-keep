@@ -23,7 +23,7 @@ export async function executeKeepaliveJob(config: JobConfig, cookie: string, log
       : computeGiftCountOfNumber(number, config.roomAllocations)
   } catch (error: unknown) {
     log(`计算赠送数量失败: ${errorMessage(error)}`)
-    return
+    throw error
   }
 
   await sendGifts({ jobs, cookie, log })

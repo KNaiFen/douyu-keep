@@ -178,7 +178,10 @@ Contracts:
   with the validated main snapshot.
 - If Yuba SSO fails after main recovery succeeds, keep the existing Yuba cookie,
   report the reason, and retry once only if the main snapshot changed.
-- The original operation is retried exactly once.
+- The original operation is retried at most once after successful recovery.
+  Gift tasks track mutation attempts with task-scoped async context. Once a
+  send request has been attempted, subsequent errors must not replay the whole
+  task, because a failed response may follow a successful remote mutation.
 - Recovery never writes refreshed cookies to CookieCloud/browser storage and
   never logs raw cookies, `LTP0`, passwords, or returned auth token values.
 
@@ -334,8 +337,14 @@ the expiring-gift and limited-time double-card jobs.
 - Successful room lookup -> reuse the DID for later gift groups in the task.
 - Failed room lookup -> current send attempt fails and carries its count; later
   groups may resolve the room again.
-- Missing `sid` / `dy` -> keep the existing early log-and-return behavior.
+- Missing `sid` / `dy` -> log and propagate the original error.
 - Failed gift send -> carry the attempted count to the next room exactly once.
+- Unsent final quantity -> throw so the manual API cannot report success.
+- Preserve the caller's allocation objects; retries must not mutate planned counts.
+- Inventory tasks (collect, keepalive, double-card, expiring) share a FIFO queue
+  across scheduled and manual runs. Keep same-type locks while queued, release
+  in finally, and preserve active locks on cron reload. Runtime shutdown stops
+  cron and waits for all queued/executing tasks before finishing.
 
 ### 5. Good/Base/Bad Cases
 

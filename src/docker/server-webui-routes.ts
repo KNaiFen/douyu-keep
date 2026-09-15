@@ -15,7 +15,7 @@ export function isDockerWebUiPagePath(path: string): boolean {
   return DOCKER_WEBUI_PAGE_PATHS.has(normalizePagePath(path))
 }
 
-export function registerWebUiRoutes(app: express.Express, ctx: AppContext): void {
+export function registerWebUiRoutes(app: express.Express, ctx: AppContext, desktopMode = false): void {
   app.use(express.static(WEBUI_ASSET_ROOT, {
     fallthrough: true,
     index: false,
@@ -26,6 +26,6 @@ export function registerWebUiRoutes(app: express.Express, ctx: AppContext): void
       next()
       return
     }
-    res.type('html').send(getHtml(ctx.getConfig()?.ui?.themeMode))
+    res.type('html').send(getHtml(ctx.getConfig()?.ui?.themeMode, desktopMode))
   })
 }

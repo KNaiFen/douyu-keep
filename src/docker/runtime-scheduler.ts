@@ -39,6 +39,10 @@ export class DockerTaskScheduler {
 
   private readonly activeRuns: Record<TaskType, boolean> = createTaskRecord(() => false)
 
+  private inventoryTail: Promise<void> = Promise.resolve()
+
+  private readonly idleWaiters = new Set<() => void>()
+
   constructor(private readonly deps: DockerTaskSchedulerDeps) {}
 
   getStatus(): Record<TaskType, JobStatus> {
@@ -47,6 +51,12 @@ export class DockerTaskScheduler {
 
   stopJobs(): void {
     TASK_TYPES.forEach(type => this.stopTask(type))
+  }
+
+  async waitForIdle(): Promise<void> {
+    if (TASK_TYPES.some(type => this.activeRuns[type])) {
+      await new Promise<void>(resolve => this.idleWaiters.add(resolve))
+    }
   }
 
   async runTaskWithLock(
@@ -66,11 +76,27 @@ export class DockerTaskScheduler {
     }
 
     this.activeRuns[type] = true
+    let releaseInventory: (() => void) | undefined
+    const previousInventoryRun = this.inventoryTail
+    if (type === 'collectGift' || type === 'keepalive' || type === 'doubleCard' || type === 'expiringGift') {
+      // Reserve the queue position before yielding; queued tasks retain their per-type lock.
+      this.inventoryTail = new Promise<void>((resolve) => {
+        releaseInventory = resolve
+      })
+    }
     try {
+      if (releaseInventory) {
+        await previousInventoryRun
+      }
       await runTask()
       return true
     } finally {
       this.activeRuns[type] = false
+      releaseInventory?.()
+      if (!TASK_TYPES.some(taskType => this.activeRuns[taskType])) {
+        this.idleWaiters.forEach(resolve => resolve())
+        this.idleWaiters.clear()
+      }
     }
   }
 

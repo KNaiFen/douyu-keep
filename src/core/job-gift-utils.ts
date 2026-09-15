@@ -1,5 +1,6 @@
 import { getBackpackStatus, getDid, getGiftNumber, parseDyAndSidFromCookie, sendGift, sleep } from './api'
 import { errorMessage } from './errors'
+import { markGiftMutationAttempted } from './gift-execution'
 import type { BackpackStatus, GiftSendJobs, Logger, SendGiftRequestArgs } from './types'
 
 export type RoomDidResolver = (roomId: number) => Promise<string>
@@ -33,7 +34,7 @@ export async function loadGiftNumber(options: {
     number = await getGiftNumber(cookie, candidateRoomIds)
   } catch (error) {
     log(`获取荧光棒数量失败: ${errorMessage(error)}`)
-    return null
+    throw error
   }
   if (number === 0) {
     log('荧光棒数量为0, 结束任务')
@@ -59,7 +60,7 @@ export async function loadBackpackStatus(options: {
     return status
   } catch (error) {
     log(`获取背包明细失败: ${errorMessage(error)}`)
-    return null
+    throw error
   }
 }
 
@@ -97,24 +98,27 @@ export async function sendGifts(options: {
     args = parseDyAndSidFromCookie(cookie)
   } catch (error: unknown) {
     log(`获取参数失败: ${errorMessage(error)}`)
-    return
+    throw error
   }
 
   let failedNumber = 0
+  let lastFailure: unknown
   const resolveDid = providedResolveDid || createRoomDidResolver(cookie)
   const sendJobs = Object.values(jobs).filter(item => item.count !== 0)
   for (const [index, item] of sendJobs.entries()) {
     try {
-      item.count += failedNumber
-      log(`即将赠送${item.roomId}房间${item.count}个${giftLabel}`)
+      log(`即将赠送${item.roomId}房间${item.count + failedNumber}个${giftLabel}`)
       const did = await resolveDid(item.roomId)
       args.did = did
-      await sendGift(args, item, cookie)
+      const attempt = { ...item, count: item.count + failedNumber }
+      markGiftMutationAttempted()
+      await sendGift(args, attempt, cookie)
       failedNumber = 0
-      log(`赠送${item.roomId}房间${item.count}个${giftLabel}成功`)
+      log(`赠送${item.roomId}房间${attempt.count}个${giftLabel}成功`)
     } catch (error) {
       failedNumber += item.count
-      log(`${item.roomId}房间赠送失败: ${error}, ${item.count}个${giftLabel}自动移交给下一个房间`)
+      lastFailure = error
+      log(`${item.roomId}房间赠送失败: ${errorMessage(error)}, ${failedNumber}个${giftLabel}${index < sendJobs.length - 1 ? '自动移交给下一个房间' : '未赠送成功'}`)
     }
     if (index < sendJobs.length - 1) {
       await sleep(2000)
@@ -123,6 +127,7 @@ export async function sendGifts(options: {
 
   if (failedNumber > 0) {
     log(`${completionLabel}执行完毕, 有${failedNumber}个${giftLabel}未赠送成功`)
+    throw new Error(`${completionLabel}未完成，有${failedNumber}个${giftLabel}未赠送成功: ${errorMessage(lastFailure)}`)
   } else {
     log(`${completionLabel}执行完毕`)
   }

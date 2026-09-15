@@ -11,8 +11,8 @@ export function buildPassportQrLoginText(status: PassportQrLoginPublicStatus | n
   return `${status.message}${retryText}${errorText}`
 }
 
-function formatCookieStatus(valid: boolean | undefined): string {
-  return valid ? '有效' : '无效'
+function formatCookieStatus(fieldsPresent: boolean | undefined): string {
+  return fieldsPresent === undefined ? '等待检测' : fieldsPresent ? '字段齐全' : '字段缺失'
 }
 
 function buildCookieStatusCells(diagnostics: CookieDiagnostics | null) {

@@ -1,0 +1,35 @@
+name: Windows Desktop
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['codex/windows-desktop']
+  pull_request:
+    branches: ['codex/windows-desktop']
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run type-check
+      - run: npm run test:contracts
+      - run: npm run dist:win
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: douyu-keep-windows-x64
+          path: |
+            release/*.exe
+            release/*.zip
+          if-no-files-found: error

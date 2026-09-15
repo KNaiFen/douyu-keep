@@ -10,3 +10,5 @@
 !vite.config.ts
 !src/
 !src/**
+!scripts/
+!scripts/clean-build.cjs

@@ -1,4 +1,5 @@
 import process from 'node:process'
+import type { Server } from 'node:http'
 import { errorMessage } from '../core/errors'
 import { createDefaultDockerConfig } from '../core/config-normalization'
 import type { DockerConfig } from '../core/types'
@@ -19,6 +20,7 @@ import type { TaskType } from './task-metadata'
 
 let currentConfig: DockerConfig | null = null
 let activeConfigPath = ''
+let runtimeStopping = false
 
 const logSystem = createLogger('系统')
 const taskLoggers: Record<TaskType, (message: string) => void> = createTaskRecord(type => createLogger(TASK_LOG_CATEGORIES[type]))
@@ -87,6 +89,10 @@ const fansSync = new DockerRuntimeFansSyncService({
 })
 
 function applyConfig(config: DockerConfig, reason: DockerRuntimeConfigApplyReason): void {
+  if (runtimeStopping) {
+    currentConfig = config
+    return
+  }
   runtimeConfigService.applyConfig(config, reason)
 }
 
@@ -94,12 +100,22 @@ export interface DockerRuntimeOptions {
   configPath: string
   webPassword: string
   webPort: number
+  webHost?: string
+  desktopToken?: string
+  handleSignals?: boolean
 }
 
-export function startDockerRuntime(options: DockerRuntimeOptions): void {
-  const { configPath, webPassword, webPort } = options
+export interface RuntimeHandle {
+  server: Server
+  url: string
+  close: () => Promise<void>
+}
+
+export async function startDockerRuntime(options: DockerRuntimeOptions): Promise<RuntimeHandle> {
+  const { configPath, webPassword, webPort, webHost = '0.0.0.0' } = options
   activeConfigPath = configPath
-  logSystem('斗鱼粉丝牌续牌 Docker 版启动')
+  runtimeStopping = false
+  logSystem(options.desktopToken ? '斗鱼粉丝牌续牌 Windows 版启动' : '斗鱼粉丝牌续牌 Docker 版启动')
 
   try {
     const config = loadConfigFromDisk(configPath)
@@ -115,6 +131,9 @@ export function startDockerRuntime(options: DockerRuntimeOptions): void {
     }
   } catch (error: unknown) {
     logSystem(`配置加载失败: ${errorMessage(error)}`)
+    cookieCloudSync.stop()
+    scheduler.stopJobs()
+    throw error
   }
 
   const ctx = createRuntimeAppContext({
@@ -147,17 +166,51 @@ export function startDockerRuntime(options: DockerRuntimeOptions): void {
     logSystem,
   })
 
-  const app = createServer(ctx)
-  app.listen(webPort, '0.0.0.0', () => {
-    logSystem(`WebUI 已启动: http://0.0.0.0:${webPort}`)
-  })
-
-  const shutdown = () => {
-    logSystem('收到停止信号，正在关闭...')
+  const app = createServer(ctx, { desktopToken: options.desktopToken, isStopping: () => runtimeStopping })
+  const server = app.listen(webPort, webHost)
+  try {
+    await new Promise<void>((resolve, reject) => {
+      server.once('listening', resolve)
+      server.once('error', reject)
+    })
+  } catch (error) {
     cookieCloudSync.stop()
     scheduler.stopJobs()
-    process.exit(0)
+    throw error
   }
-  process.on('SIGTERM', shutdown)
-  process.on('SIGINT', shutdown)
+  const address = server.address()
+  if (!address || typeof address === 'string') {
+    throw new Error('无法获取本地服务地址')
+  }
+  const url = `http://${webHost}:${address.port}`
+  logSystem(`WebUI 已启动: ${url}`)
+
+  let closing: Promise<void> | undefined
+  const close = (): Promise<void> => {
+    if (closing) {
+      return closing
+    }
+    logSystem('收到停止信号，正在关闭...')
+    runtimeStopping = true
+    cookieCloudSync.stop()
+    scheduler.stopJobs()
+    process.off('SIGTERM', shutdown)
+    process.off('SIGINT', shutdown)
+    closing = new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
+      .then(async () => {
+        await cookieCloudSync.waitForIdle()
+        await scheduler.waitForIdle()
+      })
+    return closing
+  }
+  function shutdown(): void {
+    const timeout = setTimeout(() => process.exit(1), 30_000)
+    timeout.unref()
+    void close().then(() => process.exit(0), () => process.exit(1))
+  }
+  if (options.handleSignals !== false) {
+    process.on('SIGTERM', shutdown)
+    process.on('SIGINT', shutdown)
+  }
+  return { server, url, close }
 }

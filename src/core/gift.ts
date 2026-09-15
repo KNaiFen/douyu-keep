@@ -87,9 +87,6 @@ export function computeGiftCountWithDoubleCard(
   if (activeRoomKeys.length === 0) {
     return null
   }
-  if (activeRoomKeys.length === 1) {
-    return createGiftSendJobs([{ roomId: Number(activeRoomKeys[0]), count: number }])
-  }
   return activeAllocation.allocationMode === 'weighted'
     ? computeGiftCountOfProportion(number, activeAllocation.roomAllocations)
     : computeGiftCountOfNumber(number, activeAllocation.roomAllocations)

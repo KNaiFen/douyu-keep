@@ -105,6 +105,10 @@ jobs:
             PUSH="true"
           fi
 
+          if [[ "${GITHUB_REPOSITORY}" != "tophtab/douyu-keep-just-works" ]]; then
+            PUSH="false"
+          fi
+
           {
             echo "push=${PUSH}"
             echo "channel=${CHANNEL}"

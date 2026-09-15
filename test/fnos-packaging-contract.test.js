@@ -1,12 +1,23 @@
 const assert = require('node:assert/strict')
 const { readFileSync, statSync } = require('node:fs')
 const path = require('node:path')
+const process = require('node:process')
+const { execFileSync } = require('node:child_process')
 const { test } = require('node:test')
 
 const repoRoot = path.resolve(__dirname, '..')
 
 function readRepoFile(relativePath) {
-  return readFileSync(path.join(repoRoot, relativePath), 'utf8')
+  return readFileSync(path.join(repoRoot, relativePath), 'utf8').replace(/\r\n/g, '\n')
+}
+
+function assertExecutable(relativePath) {
+  if (process.platform === 'win32') {
+    const entry = execFileSync('git', ['ls-files', '--stage', '--', relativePath], { cwd: repoRoot, encoding: 'utf8' })
+    assert.match(entry, /^100755 /)
+  } else {
+    assert.notEqual(statSync(path.join(repoRoot, relativePath)).mode & 0o111, 0)
+  }
 }
 
 function readPngSize(relativePath) {
@@ -62,11 +73,11 @@ test('fnOS package follows the Docker application contracts', () => {
   assert.match(main, /CONTAINER_NAME="douyu-keep-just-works"/)
   assert.match(main, /docker inspect --format '\{\{\.State\.Running\}\}'/)
   assert.match(main, /exit 3/)
-  assert.notEqual(statSync(mainPath).mode & 0o111, 0)
+  assertExecutable('packaging/fnos/cmd/main')
   for (const script of lifecycleScripts) {
     const scriptPath = path.join(repoRoot, 'packaging/fnos/cmd', script)
     assert.match(readFileSync(scriptPath, 'utf8'), /^#!\/bin\/bash/)
-    assert.notEqual(statSync(scriptPath).mode & 0o111, 0)
+    assertExecutable(`packaging/fnos/cmd/${script}`)
   }
 
   assert.deepEqual(readPngSize('packaging/fnos/ICON.PNG'), { width: 512, height: 512 })

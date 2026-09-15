@@ -1,4 +1,5 @@
 import { executeCollectGiftJob, executeDoubleCardJob, executeExpiringGiftJob, executeKeepaliveJob, executeYubaCheckInJob } from '../core/job'
+import { isGiftTaskReplayUnsafe, runGiftExecution } from '../core/gift-execution'
 import type { DockerConfig, DoubleCardConfig, ExpiringGiftConfig, JobConfig, YubaCheckInConfig } from '../core/types'
 import type { StatusCacheScope } from './runtime-cache'
 import { MAIN_DOUYU_URL, YUBA_DOUYU_URL } from './runtime-constants'
@@ -68,15 +69,19 @@ async function triggerConfiguredTask<TConfig>(options: {
 
 export async function runRuntimeTask(type: TaskType, config: DockerConfig[TaskType], deps: RuntimeTaskRunnerDeps): Promise<void> {
   try {
-    await runtimeTaskRunners[type](config, deps)
+    await runGiftExecution(() => runtimeTaskRunners[type](config, deps))
   } catch (error: unknown) {
+    if (isGiftTaskReplayUnsafe(error)) {
+      deps.taskLoggers[type]('本次任务已经尝试赠送礼物，为避免重复赠送，不自动重试')
+      throw error
+    }
     const refreshed = await deps.refreshCookieSourceAfterFailure(error, getTaskLabel(type))
     if (!refreshed) {
       throw error
     }
 
     deps.taskLoggers[type]('登录凭证恢复完成，重试本次任务...')
-    await runtimeTaskRunners[type](config, deps)
+    await runGiftExecution(() => runtimeTaskRunners[type](config, deps))
   }
 }
 

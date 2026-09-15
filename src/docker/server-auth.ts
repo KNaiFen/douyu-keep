@@ -1,4 +1,5 @@
 import crypto from 'node:crypto'
+import { Buffer } from 'node:buffer'
 import type express from 'express'
 import type { AppContext } from './server-types'
 
@@ -48,7 +49,7 @@ function serializeCookie(name: string, value: string, options: {
   return segments.join('; ')
 }
 
-export function createAuthHandlers(ctx: AppContext): AuthHandlers {
+export function createAuthHandlers(ctx: AppContext, desktopToken?: string): AuthHandlers {
   const sessions = new Map<string, number>()
 
   function cleanupExpiredSessions(): void {
@@ -67,6 +68,14 @@ export function createAuthHandlers(ctx: AppContext): AuthHandlers {
   }
 
   function isAuthenticated(req: express.Request): boolean {
+    if (desktopToken) {
+      const supplied = req.get('X-Douyu-Desktop-Token') || ''
+      const expected = Buffer.from(desktopToken)
+      const actual = Buffer.from(supplied)
+      if (actual.length === expected.length && crypto.timingSafeEqual(actual, expected)) {
+        return true
+      }
+    }
     cleanupExpiredSessions()
     const token = getSessionToken(req)
     if (!token) {

@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.docker.json",
+  "include": ["src/core/**/*.ts", "src/docker/**/*.ts", "src/desktop/**/*.ts"],
+  "exclude": ["node_modules", "src/docker/webui"]
+}

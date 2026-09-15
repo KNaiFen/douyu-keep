@@ -15,7 +15,7 @@ defineProps<{
   versionLabel: string
 }>()
 
-const PROJECT_URL = 'https://github.com/tophtab/douyu-keep-just-works'
+const PROJECT_URL = 'https://github.com/KNaiFen/douyu-keep'
 </script>
 
 <template>
@@ -37,7 +37,7 @@ const PROJECT_URL = 'https://github.com/tophtab/douyu-keep-just-works'
     </div>
     <p class="brand-copy">
       <span>斗鱼荧光棒|续粉丝牌|检测双倍|鱼吧签到</span>
-      <span class="brand-source">基于Curtion/douyu-keep vibe coding</span>
+      <span class="brand-source">基于 tophtab / Curtion 的 douyu-keep</span>
     </p>
 
     <div class="tab-list" role="tablist" aria-label="管理台页面" aria-orientation="vertical">

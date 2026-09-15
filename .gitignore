@@ -20,6 +20,11 @@ config/
 
 # Local browser captures may contain cookies and personal request data.
 .temp/
+.materials/
+.codegraph/
+release/
+output/playwright/
+
 
 # fnOS package metadata is an installable resource, not local runtime state.
 !packaging/fnos/config/

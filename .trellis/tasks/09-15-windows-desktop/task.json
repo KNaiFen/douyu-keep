@@ -1,0 +1,9 @@
+{
+  "id": "windows-desktop",
+  "name": "windows-desktop",
+  "title": "Restore Windows desktop and fix reviewed task issues",
+  "status": "in_progress",
+  "branch": "codex/windows-desktop",
+  "description": "User explicitly authorized implementation and public fork creation.",
+  "created_at": "2026-09-15"
+}

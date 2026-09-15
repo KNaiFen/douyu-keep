@@ -53,7 +53,8 @@ export async function executeDoubleCardJob(config: DoubleCardConfig, cookie: str
       doubleCardRooms[roomIdText] = doubleInfo.active
       log(doubleInfo.active ? `房间${roomId}检测到双倍亲密度卡生效` : `房间${roomId}未检测到双倍亲密度卡`)
     } catch (error: unknown) {
-      log(`房间${roomId}双倍状态检测失败，跳过该房间: ${errorMessage(error)}`)
+      log(`房间${roomId}双倍状态检测失败: ${errorMessage(error)}`)
+      throw error
     }
   }
 
@@ -73,7 +74,7 @@ export async function executeDoubleCardJob(config: DoubleCardConfig, cookie: str
       jobs = computeGiftCountWithDoubleCard(group.giftCount, participatingAllocation, doubleCardRooms)
     } catch (error: unknown) {
       log(`计算${giftLabel}双倍赠送数量失败: ${errorMessage(error)}`)
-      continue
+      throw error
     }
     if (jobs === null) {
       continue

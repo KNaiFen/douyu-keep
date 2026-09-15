@@ -26,14 +26,17 @@ const THEME_COLOR_BY_MODE: Record<'light' | 'dark', string> = {
 let cachedTemplate: string | null = null
 
 function readPackageVersion(): string {
-  try {
-    const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8')) as { version?: unknown }
-    return typeof packageJson.version === 'string' && packageJson.version.trim()
-      ? packageJson.version.trim()
-      : '0.0.0'
-  } catch {
-    return '0.0.0'
+  for (const candidate of ['../../../package.json', '../../package.json']) {
+    try {
+      const packageJson = JSON.parse(fs.readFileSync(path.resolve(__dirname, candidate), 'utf8')) as { version?: unknown }
+      if (typeof packageJson.version === 'string' && packageJson.version.trim()) {
+        return packageJson.version.trim()
+      }
+    } catch {
+      // Build output and Docker images place package metadata at different depths.
+    }
   }
+  return '0.0.0'
 }
 
 function escapeHtml(value: string): string {
@@ -68,11 +71,12 @@ function readTemplate(): string {
   return cachedTemplate
 }
 
-export function getHtml(themeMode: unknown = 'system'): string {
+export function getHtml(themeMode: unknown = 'system', desktopMode = false): string {
   const initialThemeMode = resolveThemeMode(themeMode)
   const initialTheme = resolveInitialTheme(initialThemeMode)
   let html = readTemplate()
   html = replaceToken(html, '__APP_NAME__', escapeHtml(APP_NAME))
+  html = replaceToken(html, '__DESKTOP_MODE__', JSON.stringify(desktopMode))
   html = replaceToken(html, '__APP_VERSION_LABEL__', escapeHtml(APP_VERSION_LABEL))
   html = replaceToken(html, '__DOCKER_WEBUI_PAGE_ROUTES_JSON__', JSON.stringify(DOCKER_WEBUI_PAGE_ROUTES))
   html = replaceToken(html, '__INITIAL_THEME_MODE__', escapeHtml(initialThemeMode))

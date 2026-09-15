@@ -9,13 +9,20 @@ import { isDockerWebUiPagePath, registerWebUiRoutes } from './server-webui-route
 
 export type { AppContext, JobStatus }
 
-export function createServer(ctx: AppContext): express.Express {
+export function createServer(ctx: AppContext, options: { desktopToken?: string, isStopping?: () => boolean } = {}): express.Express {
   const app = express()
-  const auth = createAuthHandlers(ctx)
+  const auth = createAuthHandlers(ctx, options.desktopToken)
 
+  app.use((_req, res, next) => {
+    if (options.isStopping?.()) {
+      res.status(503).json({ error: '程序正在退出' })
+      return
+    }
+    next()
+  })
   app.use(express.json())
 
-  registerWebUiRoutes(app, ctx)
+  registerWebUiRoutes(app, ctx, Boolean(options.desktopToken))
   auth.registerAuthRoutes(app)
   auth.registerProtectedBoundary(app, isDockerWebUiPagePath)
   registerConfigRoutes(app, ctx)

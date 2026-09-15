@@ -14,6 +14,7 @@ RUN npm prune --omit=dev --omit=optional --ignore-scripts --no-audit --no-fund
 FROM deps AS builder
 
 COPY src ./src
+COPY scripts/clean-build.cjs ./scripts/clean-build.cjs
 RUN npm run build:docker
 
 FROM node:24-slim AS runtime
