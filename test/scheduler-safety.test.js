@@ -11,6 +11,7 @@ function deferred() {
 }
 
 function createScheduler(run = async () => {}) {
+  let cookie = 'account-a'
   const jobs = []
   class CronJob {
     constructor(_cron, callback) {
@@ -37,14 +38,33 @@ function createScheduler(run = async () => {}) {
   const scheduler = new DockerTaskScheduler({
     logSystem: () => {},
     taskLoggers: Object.fromEntries(['collectGift', 'keepalive', 'doubleCard', 'expiringGift', 'yubaCheckIn'].map(type => [type, () => {}])),
-    resolveCookieForUrl: () => '',
+    resolveCookieForUrl: () => cookie,
     refreshCookieSourceAfterFailure: async () => false,
     runAndInvalidateStatusCache: async (_scope, task) => task(),
   })
-  return { scheduler, jobs }
+  return { scheduler, jobs, setCookie: (value) => {
+    cookie = value
+  } }
 }
 
 const options = { onBusy: 'throw', busyMessage: 'busy' }
+
+test('queued inventory work cannot execute old room settings after account cookies change', async () => {
+  const { scheduler, setCookie } = createScheduler()
+  const gate = deferred()
+  const first = scheduler.runTaskWithLock('keepalive', () => gate.promise, options)
+  await Promise.resolve()
+  let executed = false
+  const queued = scheduler.runTaskWithLock('doubleCard', async () => {
+    executed = true
+  }, options)
+  const rejected = assert.rejects(queued, /登录凭证.*变化/)
+  setCookie('account-b')
+  gate.resolve()
+  await Promise.all([first, rejected, scheduler.waitForIdle()])
+  assert.equal(executed, false)
+  assert.equal(await scheduler.runTaskWithLock('doubleCard', async () => {}, options), true)
+})
 
 test('inventory tasks queue in order while independent Yuba work can run', async () => {
   const { scheduler } = createScheduler()

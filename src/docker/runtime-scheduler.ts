@@ -5,7 +5,7 @@ import type { JobStatus } from './server'
 import { jsonEquals } from './config-equality'
 import { createTaskRecord, formatTaskList, getTaskConfig, getTaskCron, getTaskLabel, getTaskScheduleSummary, isTaskEnabled, TASK_TYPES } from './task-metadata'
 import type { TaskType } from './task-metadata'
-import { DOCKER_TIMEZONE } from './runtime-constants'
+import { DOCKER_TIMEZONE, MAIN_DOUYU_URL } from './runtime-constants'
 import type { StatusCacheScope } from './runtime-cache'
 import { createStatusTimestamp, formatScheduleForLog } from './runtime-time'
 import {
@@ -75,10 +75,12 @@ export class DockerTaskScheduler {
       throw new Error(options.busyMessage)
     }
 
+    const usesInventory = type === 'collectGift' || type === 'keepalive' || type === 'doubleCard' || type === 'expiringGift'
+    const queuedCookie = usesInventory ? this.deps.resolveCookieForUrl(MAIN_DOUYU_URL) : undefined
     this.activeRuns[type] = true
     let releaseInventory: (() => void) | undefined
     const previousInventoryRun = this.inventoryTail
-    if (type === 'collectGift' || type === 'keepalive' || type === 'doubleCard' || type === 'expiringGift') {
+    if (usesInventory) {
       // Reserve the queue position before yielding; queued tasks retain their per-type lock.
       this.inventoryTail = new Promise<void>((resolve) => {
         releaseInventory = resolve
@@ -87,6 +89,9 @@ export class DockerTaskScheduler {
     try {
       if (releaseInventory) {
         await previousInventoryRun
+        if (this.deps.resolveCookieForUrl(MAIN_DOUYU_URL) !== queuedCookie) {
+          throw new Error('排队期间登录凭证已变化，已取消本次任务，请重新触发')
+        }
       }
       await runTask()
       return true
