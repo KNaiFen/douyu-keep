@@ -18,7 +18,6 @@ defineProps<{
   activeTab: WebUiPageTab
   appName: string
   authenticated: boolean
-  desktopMode?: boolean
   handleTabKeydown: (event: KeyboardEvent) => void
   overviewPage: ReturnType<typeof useOverviewPage>
   savingThemeMode: ThemeMode | null
@@ -62,7 +61,6 @@ const emit = defineEmits<{
           </p>
         </div>
         <TopToolbar
-          :hide-logout="desktopMode"
           :refresh-loading="overviewPage.refreshLoading.value"
           :refresh-overview-title="overviewPage.refreshOverviewTitle.value"
           @refresh="emit('refreshOverview')"

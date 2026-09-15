@@ -5,6 +5,7 @@ Restore Windows 10/11 x64 support on top of tophtab/douyu-keep-just-works.
 - Public fork: KNaiFen/douyu-keep; development branch: codex/windows-desktop.
 - Preserve the backend, normalized config format, task types, and Vue WebUI.
 - Deliver a double-clickable local application, followed by tray, optional login startup, and an installer.
+- Use the default browser for WebUI and open it automatically after local startup; do not use Electron.
 - Fix the reviewed gift carry-over, swallowed failures, inventory concurrency, misleading cookie diagnostics, and single-room fixed allocation issues.
 - Preserve upstream history and the comparison report; keep local materials out of Git.
 - Validate without using real account credentials or sending gifts.

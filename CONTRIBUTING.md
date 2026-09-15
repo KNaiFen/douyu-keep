@@ -5,9 +5,12 @@ Shared business logic and the Docker deployment path must remain compatible.
 
 ## Windows Development
 
-Use Node.js 24 on Windows 10/11 x64. After `npm ci`, run `npm run dev:desktop`.
-Use `npm run dist:win` for the x64 ZIP and NSIS installer under `release/`.
-Desktop host code belongs in `src/desktop/`; share the backend and Vue UI.
+Use Node.js 24 on Windows 10/11 x64. After `npm ci`, run `npm run pack:win`,
+then launch `release/windows-x64/douyu-keep.exe` to open the default browser.
+Use `npm run dist:win` for the x64 ZIP and NSIS installer under `release/`;
+install NSIS or set `MAKENSIS_PATH` to its executable. The Windows .NET Framework
+compiler builds `packaging/windows/Launcher.cs`. Backend entry code belongs in
+`src/desktop/`; share the backend and Vue UI. Do not reintroduce Electron.
 Run `npm run lint`, `npm run type-check`, and `npm run test:contracts` before
 packaging. Never use real account data in smoke tests or captured screenshots.
 
@@ -47,8 +50,8 @@ runtime test suite yet.
   into `build/docker/docker/webui/`; the former legacy `app-*.js` source
   modules must stay deleted.
 - The Docker image must continue to build with `npm run build:docker`.
-- Do not add Electron, Yarn desktop release, or renderer packaging work unless
-  desktop support is explicitly restored.
+- Windows packaging uses a native tray launcher and the default browser;
+  keep its Node runtime packaging separate from Docker builds.
 
 ## Pull Requests
 

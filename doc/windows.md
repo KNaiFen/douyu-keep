@@ -2,28 +2,35 @@
 
 ## Build And Run
 
-Requirements: Windows 10/11 x64, Node.js 24, npm, Git.
+Build requirements: Windows 10/11 x64, Node.js 24, npm, Git, and the Windows
+.NET Framework compiler. Full installer builds also require NSIS; set
+`MAKENSIS_PATH` when it is not installed in `C:/Program Files (x86)/NSIS`.
+End users need neither Node.js nor Docker: Node is included in the package.
 
 ```sh
 npm ci
-npm run dev:desktop
+npm run pack:win
 npm run dist:win
 ```
 
-`release/win-unpacked/douyu-keep.exe` is the unpacked application. Distribute
+`release/windows-x64/douyu-keep.exe` is the unpacked application. Distribute
 the entire ZIP, not that executable alone. The NSIS installer and ZIP are built
 for x64. Local builds are unsigned; no signing certificate is configured.
-`npm run start:desktop` reuses an existing build.
+`pack:win` builds the portable ZIP without requiring NSIS. `dist:win` also
+builds `release/douyu-keep-<version>-windows-x64.exe`.
 
 ## Runtime
 
-The Electron main process hosts the existing Node backend. Its Vue WebUI uses
-an ephemeral loopback HTTP port and a process-local random authentication token
-injected by the Electron session. The renderer has no Node integration or preload
-bridge. Token values are not placed in URLs, config files, HTML, or logs.
-External HTTP(S) links open in the default browser; other navigation is rejected.
-Desktop mode hides the server-password logout button; Douyu credential management
-is unchanged. Docker retains its normal password/session authentication.
+The native WinForms tray launcher starts the bundled Node backend with no console
+window. Once ready, it opens the existing Vue WebUI in the default browser using
+an ephemeral `127.0.0.1` HTTP port. No Electron or bundled browser is used.
+A random token is passed to Node through the child environment and to the browser
+through `#web-password=...`. The WebUI removes this fragment with `replaceState`
+before exchanging it for its normal authenticated session cookie. The token does
+not enter HTTP URL requests, HTML, config, or launcher logs. Browser extensions
+and other software with access to the browser are outside this boundary.
+Logout remains available; reopen from the tray to log in again. Docker retains
+its normal password/session authentication, including legacy query auto-login.
 
 Configuration is `%APPDATA%/douyu-keep/config.json`. `DOUYU_KEEP_DATA_DIR` may
 override the data directory for isolated testing. Corrupt config stops startup
@@ -31,9 +38,23 @@ instead of replacing existing data. Windows startup uses the current executable
 path with `--hidden` and is opt-in through the tray menu. Uninstall removes this
 startup entry and keeps user configuration.
 
-Closing the window hides it in the tray. Exit stops cron, stops accepting HTTP
+Closing the browser leaves the service running in the tray. Repeated launches
+open the running service without starting another backend for the same data
+directory. Manual launches open the browser; optional login startup uses
+`--hidden` and leaves the browser closed. `douyu-keep.exe --stop` requests exit.
+
+Exit stops cron, stops accepting HTTP
 connections, and waits for queued/running tasks, with a 30-second process timeout.
 Sleep/offline time is not backfilled. In-memory logs retain the upstream lifetime.
+Launcher output is saved to `backend.log`, rotated at 2 MiB with one backup.
+The child belongs to a Windows Job Object so terminating the launcher cannot
+leave an orphaned scheduler. A failed HTTP stop request still waits for the
+backend before the launcher forces termination. Shutdown/logoff can shorten
+the available drain time.
+
+Install and uninstall refuse to modify a running application. The installer
+creates desktop/start-menu shortcuts for the current user without elevation;
+uninstall keeps the user data directory and removes its autostart entry.
 
 ## Reviewed Fixes
 
@@ -67,18 +88,23 @@ The inherited Docker workflow cannot publish the upstream image from this fork.
 
 ## Verification
 
-The local Windows run passed lint, all three TypeScript checks, 58 offline
-contract tests, Vite/backend/desktop builds, and Electron packaging. The packaged
-application was exercised through Playwright from an unrelated working directory:
-all eight pages, asset loading, local auth isolation, persisted theme, 390-pixel
-layout, window-to-tray hiding, second-instance activation, and hidden startup.
-Screenshots are local under `output/playwright/` and contain no account data.
-NSIS installation/uninstallation also passed in a path containing spaces.
-The installed executable launched, startup toggled on/off, uninstall removed its
-startup entry and program files, and user configuration survived uninstall.
+Quality checks are `npm run lint`, `npm run type-check`, and
+`npm run test:contracts` (63 offline cases). `npm run dist:win` builds the
+WebUI/backend, native launcher, portable ZIP, and NSIS installer.
 
-`scripts/smoke-desktop.cjs` and `scripts/smoke-installer.cjs` use Playwright's
-Electron driver. Set `PLAYWRIGHT_MODULE` to an installed Playwright module path
-when it is not a project dependency. Installer smoke uses a temporary directory
-and the current user's registry; it refuses to replace an existing startup entry.
-No real Douyu login or gift mutation is part of these checks.
+After building, `npm run test:windows` uses Playwright with installed Chrome.
+Set `PLAYWRIGHT_MODULE` to an installed Playwright module path when it is not
+a project dependency. It checks all eight pages, asset loading, automatic auth,
+URL cleanup, persisted theme, 390-pixel layout, logout/relogin, stop authorization,
+native hidden startup, process cleanup, install/uninstall running guards,
+installation in a path containing spaces, retained configuration, delayed-ready
+shutdown, and equivalent data-directory instance keys.
+Installer smoke changes the current user's install registration and shortcuts;
+run it in a development account without an existing installed copy.
+Screenshots are local under `output/playwright/`. No real Douyu login or gift
+mutation is part of these checks.
+
+The local browser/native/installer smoke and quality gates passed. Manual launch
+opened the system default Chrome. Native UI automation stopped because its
+browser URL detection could not enforce its policy, so native tray-menu clicking
+and startup toggling were not re-verified through the Windows UI.

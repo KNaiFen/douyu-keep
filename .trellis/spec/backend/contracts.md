@@ -20,8 +20,69 @@
 | GitHub Actions validation steps or quality-gate path filters | [Docker CI Quality Gate](#docker-ci-quality-gate) |
 | fnOS FPK package source or release workflow | [fnOS FPK Release](#fnos-fpk-release) |
 | Docker task labels, schedule summaries, and active checks | [Docker Task Metadata Ownership](#docker-task-metadata-ownership) |
+| Windows launcher, browser authentication, shutdown, or packaging | [Windows Browser Runtime](#windows-browser-runtime) |
 
 ---
+
+## Windows Browser Runtime
+
+### 1. Scope / Trigger
+
+The Windows launcher hosts the shared backend and opens the default browser.
+Changes to native lifecycle, loopback auth, or packaging must preserve Docker.
+
+### 2. Signatures
+
+- `douyu-keep.exe [--hidden | --stop]`
+- `startDockerRuntime({ configPath, webPort, webHost, webPassword, desktopToken, onShutdown })`
+- `POST /api/desktop/shutdown` with `X-Douyu-Desktop-Token`
+- `npm run pack:win`, `npm run dist:win`, `npm run test:windows`
+
+### 3. Contracts
+
+- Bundle Node 24 x64, production dependencies, backend, and Vite assets. No Electron.
+- The native launcher sets `DOUYU_KEEP_DATA_DIR` and a random
+  `DOUYU_KEEP_LAUNCHER_TOKEN` on the child. Node binds `127.0.0.1:0` and prints
+  `{ "desktopReady": true, "url": "http://127.0.0.1:<port>" }` when ready.
+- Browser auto-login consumes `#web-password=...`, clears credentials from hash
+  and legacy query before login, then uses normal authenticated session cookies.
+  Fragment credentials take precedence. Never log or persist the launcher token.
+- A user/data-directory mutex serializes instances. A second launch activates
+  the existing browser URL. `--hidden` suppresses opening on initial startup.
+- Exit uses the token-protected route, stops new tasks, and drains ongoing work.
+  A failed HTTP request must still allow the 30-second process exit wait.
+  A Job Object prevents orphaned backends if the launcher is terminated.
+- NSIS checks the running marker both at initialization and before file changes.
+  Install/uninstall preserve `%APPDATA%/douyu-keep/config.json`.
+
+### 4. Validation & Error Matrix
+
+- Missing child environment -> reject startup; malformed existing config -> fail
+  without replacing user data.
+- Unauthenticated config request -> 401; missing/wrong shutdown token -> 403.
+- Runtime stopping -> 503 for new requests; valid shutdown token -> 200 then stop.
+- Running launcher -> installation/uninstallation aborts with exit code 1.
+
+### 5. Good/Base/Bad Cases
+
+- Good: double-click opens an authenticated browser, then closing the browser
+  leaves scheduled tasks running; the tray can reopen or stop the service.
+- Base: login autostart runs hidden until the user opens the tray.
+- Bad: a webpage without the launcher token cannot shut down the backend.
+
+### 6. Tests Required
+
+`test/browser-auth.test.js` covers credential precedence and early URL cleanup.
+`test/desktop-runtime.test.js` covers loopback, config protection/persistence and
+shutdown authorization. `scripts/smoke-windows.cjs` exercises packaged browser,
+native process, and NSIS flows, including paths with spaces and running guards.
+
+### 7. Wrong vs Correct
+
+Wrong: pass a quoted `/D=<path with spaces>` argument to NSIS through Node's
+default argument quoting; NSIS can silently use its default installation path.
+Correct: pass `/D=...` last using `windowsVerbatimArguments: true`, and assert
+that the executable was installed into that exact directory before launching it.
 
 ## Config And Persistence Contracts
 

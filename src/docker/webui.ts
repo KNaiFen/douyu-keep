@@ -71,12 +71,11 @@ function readTemplate(): string {
   return cachedTemplate
 }
 
-export function getHtml(themeMode: unknown = 'system', desktopMode = false): string {
+export function getHtml(themeMode: unknown = 'system'): string {
   const initialThemeMode = resolveThemeMode(themeMode)
   const initialTheme = resolveInitialTheme(initialThemeMode)
   let html = readTemplate()
   html = replaceToken(html, '__APP_NAME__', escapeHtml(APP_NAME))
-  html = replaceToken(html, '__DESKTOP_MODE__', JSON.stringify(desktopMode))
   html = replaceToken(html, '__APP_VERSION_LABEL__', escapeHtml(APP_VERSION_LABEL))
   html = replaceToken(html, '__DOCKER_WEBUI_PAGE_ROUTES_JSON__', JSON.stringify(DOCKER_WEBUI_PAGE_ROUTES))
   html = replaceToken(html, '__INITIAL_THEME_MODE__', escapeHtml(initialThemeMode))

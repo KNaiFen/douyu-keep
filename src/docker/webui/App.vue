@@ -12,7 +12,6 @@ import { useToastRegion } from './toast'
 
 interface WebUiBootstrap {
   appName: string
-  desktopMode?: boolean
   appVersionLabel: string
   initialThemeMode?: ThemeMode
   pageRoutes: Record<string, string>
@@ -90,7 +89,6 @@ watch([authenticated, activeTab], ([nextAuthenticated, nextTab]) => {
     :active-tab="activeTab"
     :app-name="bootstrap.appName"
     :authenticated="authenticated"
-    :desktop-mode="bootstrap.desktopMode"
     :handle-tab-keydown="handleTabKeydown"
     :overview-page="overviewPage"
     :saving-theme-mode="savingThemeMode"

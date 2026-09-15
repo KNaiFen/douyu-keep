@@ -30,13 +30,19 @@ function consumeWebPasswordFromUrl(): { password: string, present: boolean } {
 
   try {
     const currentUrl = new URL(window.location.href)
-    if (!currentUrl.searchParams.has('web-password')) {
+    const fragmentParams = new URLSearchParams(currentUrl.hash.slice(1))
+    const hasFragmentPassword = fragmentParams.has('web-password')
+    if (!hasFragmentPassword && !currentUrl.searchParams.has('web-password')) {
       return result
     }
 
     result.present = true
-    result.password = currentUrl.searchParams.get('web-password') || ''
+    result.password = (hasFragmentPassword ? fragmentParams : currentUrl.searchParams).get('web-password') || ''
     currentUrl.searchParams.delete('web-password')
+    if (hasFragmentPassword) {
+      fragmentParams.delete('web-password')
+      currentUrl.hash = fragmentParams.toString()
+    }
     window.history.replaceState(null, '', currentUrl.pathname + currentUrl.search + currentUrl.hash)
   } catch {
     return result

@@ -11,7 +11,10 @@ test('desktop runtime binds loopback, protects config, persists it and closes cl
   const { startDockerRuntime } = loadTypeScriptModule('src/docker/runtime.ts')
   const desktopToken = crypto.randomBytes(32).toString('hex')
   const configPath = path.join(dataDir, 'config.json')
-  const runtime = await startDockerRuntime({ configPath, webPort: 0, webHost: '127.0.0.1', webPassword: 'synthetic-test-password', desktopToken, handleSignals: false })
+  let shutdownCalls = 0
+  const runtime = await startDockerRuntime({ configPath, webPort: 0, webHost: '127.0.0.1', webPassword: 'synthetic-test-password', desktopToken, handleSignals: false, onShutdown: () => {
+    shutdownCalls++
+  } })
   try {
     assert.equal(runtime.server.address().address, '127.0.0.1')
     assert.equal((await fetch(`${runtime.url}/api/config`)).status, 401)
@@ -23,6 +26,12 @@ test('desktop runtime binds loopback, protects config, persists it and closes cl
     assert.equal(JSON.stringify(persisted).includes(desktopToken), false)
     const status = await fetch(`${runtime.url}/api/auth/status`, { headers: { 'X-Douyu-Desktop-Token': desktopToken } })
     assert.deepEqual(await status.json(), { authenticated: true })
+    const shutdownUrl = `${runtime.url}/api/desktop/shutdown`
+    assert.equal((await fetch(shutdownUrl, { method: 'POST' })).status, 403)
+    assert.equal((await fetch(shutdownUrl, { method: 'POST', headers: { 'X-Douyu-Desktop-Token': 'incorrect' } })).status, 403)
+    assert.equal(shutdownCalls, 0)
+    assert.equal((await fetch(shutdownUrl, { method: 'POST', headers: { 'X-Douyu-Desktop-Token': desktopToken } })).status, 200)
+    assert.equal(shutdownCalls, 1)
   } finally {
     await runtime.close()
     await runtime.close()

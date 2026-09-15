@@ -1,7 +1,7 @@
 <div align="center">
   <img src="./icon.png" alt="douyu-keep" width="76">
   <h1>douyu-keep</h1>
-  <p><strong>斗鱼粉丝牌 Windows 桌面管理台</strong></p>
+  <p><strong>斗鱼粉丝牌 Windows 本地管理工具</strong></p>
   <p>基于 tophtab/douyu-keep-just-works，保留业务后端、配置体系和 WebUI，支持 Windows 10/11 x64。</p>
 
   <p>
@@ -25,13 +25,14 @@
 
 在本仓库 Actions 的 Windows Desktop 构建产物中下载 x64 安装包或 ZIP。ZIP 解压后双击 `douyu-keep.exe`；安装包可选择安装目录、创建桌面和开始菜单快捷方式。运行时已随包携带，无需安装 Node.js 或 Docker。
 
-- 启动后直接进入 WebUI，不需要输入本地管理密码；斗鱼账号仍需在登录配置页扫码或配置 Cookie。
-- 关闭窗口后继续在托盘运行。双击托盘图标重新打开，右键菜单提供配置目录、开机自启和退出。
+- 启动后自动用默认浏览器打开本地 WebUI，不使用 Electron，不需要输入本地管理密码；斗鱼账号仍需在登录配置页扫码或配置 Cookie。
+- 关闭浏览器后继续在托盘运行。双击托盘图标重新打开，右键菜单提供配置目录、开机自启和退出。
 - 开机自启默认关闭，勾选后以托盘模式启动；ZIP 移动目录后需要重新勾选。
 - 配置文件位于 `%APPDATA%\douyu-keep\config.json`。升级和卸载默认保留配置；迁移 fork 配置前先退出程序，再备份并替换该文件。
-- 后端只监听 `127.0.0.1`，端口自动分配。重复启动会打开已有窗口。
+- 后端只监听 `127.0.0.1`，端口自动分配。重复启动会在浏览器中打开已有服务，不重复运行任务。退出 WebUI 登录后也可通过托盘重新打开并登录。
 - 退出时停止调度并等待任务结束，最多等待 30 秒；Windows 关机或强制结束进程无法保证正在运行的任务完整结束。
 - 计算机睡眠、关机或退出程序期间不执行任务，恢复后按下一次 Cron 运行，不补跑错过的任务。
+- 更新或卸载前请先从托盘退出程序；运行中的程序会阻止安装、卸载。
 
 详细构建、验证及行为修复见 [Windows 说明](doc/windows.md)。上游来源为 [tophtab/douyu-keep-just-works](https://github.com/tophtab/douyu-keep-just-works)，最初项目为 [Curtion/douyu-keep](https://github.com/Curtion/douyu-keep)。保留上游许可和贡献记录。
 

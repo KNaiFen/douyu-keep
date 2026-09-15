@@ -9,7 +9,7 @@ import { isDockerWebUiPagePath, registerWebUiRoutes } from './server-webui-route
 
 export type { AppContext, JobStatus }
 
-export function createServer(ctx: AppContext, options: { desktopToken?: string, isStopping?: () => boolean } = {}): express.Express {
+export function createServer(ctx: AppContext, options: { desktopToken?: string, isStopping?: () => boolean, onShutdown?: () => void } = {}): express.Express {
   const app = express()
   const auth = createAuthHandlers(ctx, options.desktopToken)
 
@@ -22,7 +22,17 @@ export function createServer(ctx: AppContext, options: { desktopToken?: string, 
   })
   app.use(express.json())
 
-  registerWebUiRoutes(app, ctx, Boolean(options.desktopToken))
+  if (options.desktopToken && options.onShutdown) {
+    app.post('/api/desktop/shutdown', (req, res) => {
+      if (req.get('X-Douyu-Desktop-Token') !== options.desktopToken) {
+        res.status(403).json({ error: '只允许本机启动器退出服务' })
+        return
+      }
+      res.json({ ok: true })
+      options.onShutdown?.()
+    })
+  }
+  registerWebUiRoutes(app, ctx)
   auth.registerAuthRoutes(app)
   auth.registerProtectedBoundary(app, isDockerWebUiPagePath)
   registerConfigRoutes(app, ctx)

@@ -103,6 +103,7 @@ export interface DockerRuntimeOptions {
   webHost?: string
   desktopToken?: string
   handleSignals?: boolean
+  onShutdown?: () => void
 }
 
 export interface RuntimeHandle {
@@ -166,7 +167,7 @@ export async function startDockerRuntime(options: DockerRuntimeOptions): Promise
     logSystem,
   })
 
-  const app = createServer(ctx, { desktopToken: options.desktopToken, isStopping: () => runtimeStopping })
+  const app = createServer(ctx, { desktopToken: options.desktopToken, isStopping: () => runtimeStopping, onShutdown: options.onShutdown })
   const server = app.listen(webPort, webHost)
   try {
     await new Promise<void>((resolve, reject) => {
